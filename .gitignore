@@ -1,0 +1,12 @@
+#Executables
+test
+*.out
+
+# Object Files
+*.o
+
+#vscode
+.vscode/
+
+#linux temp
+*.swap
