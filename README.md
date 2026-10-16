@@ -1,24 +1,80 @@
 # Custom Memory Allocator in C
 
-A custom implementation of dynamic memory management in C, providing `malloc()`, `calloc()`, `realloc()`, and `free()` with built-in debugging, integrity checking, and leak-detection features.
+A custom dynamic memory allocator implemented in C. It provides custom versions of `malloc()`, `calloc()`, `realloc()`, and `free()` using a first-fit allocation strategy.
 
-This project is designed to demonstrate how a heap allocator works internally, including block metadata, splitting, coalescing, and safe memory diagnostics.
+The allocator manages its own heap using linked memory blocks and includes block splitting, block coalescing, heap-integrity checking, double-free detection, invalid-pointer detection, and basic allocation statistics.
 
 ## Features
 
 - Custom implementations of:
-  - `malloc()`
-  - `calloc()`
-  - `realloc()`
-  - `free()`
-- Block splitting for efficient use of heap space
-- Block coalescing to reduce external fragmentation
-- Heap integrity checking
-- Memory leak detection
+  - `malloc_clone()`
+  - `calloc_clone()`
+  - `realloc_clone()`
+  - `free_clone()`
+- First-fit free-block search
+- Block splitting
+- Block coalescing
+- 8-byte memory alignment
+- Heap integrity checking using magic numbers
 - Double-free detection
-- Invalid pointer detection
-- Heap usage statistics
-- Debug utilities for allocator diagnostics
+- Invalid-pointer detection
+- Basic allocator statistics
+- Simple test suite
+
+## Allocation Strategy
+
+This allocator uses the **first-fit strategy**.
+
+When `malloc_clone()` is called, the allocator searches the linked list of blocks from the beginning and selects the **first free block** whose size is greater than or equal to the requested size.
+
+If no suitable free block is found, the allocator requests more memory from the operating system using `sbrk()`.
+
+### Why First-Fit?
+
+First-fit is simple and fast because it stops searching as soon as it finds a usable block. It is a common strategy for educational and basic heap allocators.
+
+## How It Works
+
+Each allocation is stored as a block containing metadata followed by user memory:
+
+```text
++----------------------+----------------------------+
+| Block metadata       | User memory                |
++----------------------+----------------------------+
+^                      ^
+block_t                pointer returned to user
+```
+
+The block metadata contains:
+
+- Usable block size
+- Allocation status: free or allocated
+- Pointer to the previous block
+- Pointer to the next block
+- Magic number for block validation
+
+### Block Splitting
+
+If a free block is much larger than the requested allocation size, it is split into two parts:
+
+1. An allocated block of the requested size  
+2. A remaining free block  
+
+This reduces wasted space inside large free blocks.
+
+### Block Coalescing
+
+When a block is freed, the allocator checks whether neighboring blocks are also free. If they are, it merges them into one larger free block.
+
+This reduces external fragmentation and makes larger allocations more likely to succeed later.
+
+### Safety Checks
+
+Before freeing or reallocating a pointer, the allocator checks its metadata. It can detect:
+
+- Invalid or corrupted pointers
+- Double-free attempts
+- Heap corruption
 
 ## Project Structure
 
@@ -37,23 +93,22 @@ This project is designed to demonstrate how a heap allocator works internally, i
 └── .gitignore
 ```
 
-## Getting Started
+## Build and Run
 
 ### Prerequisites
 
 - GCC or Clang
 - Make
+- Linux or another POSIX-compatible system, since the allocator uses `sbrk()`
 
-### Build
-
-Clone the repository:
+### Clone the Repository
 
 ```bash
 git clone [https://github.com/rahulcmca25-hub/Custom-Memory-Allocator-C.git](https://github.com/rahulcmca25-hub/Custom-Memory-Allocator-C.git)
 cd Custom-Memory-Allocator-C
 ```
 
-Build the project:
+### Build
 
 ```bash
 make
@@ -65,13 +120,13 @@ make
 ./test
 ```
 
-### Clean Build Artifacts
+### Clean Build Files
 
 ```bash
 make clean
 ```
 
-## Usage Example
+## Usage
 
 ```c
 #include "Allocator.h"
@@ -91,65 +146,53 @@ int main(void) {
 
     arr = (int *)realloc_clone(arr, 20 * sizeof(int));
 
-    my_free(arr);
+    if (arr == NULL) {
+        fprintf(stderr, "Memory reallocation failed\n");
+        return 1;
+    }
+
+    free_clone(arr);
 
     return 0;
 }
 ```
 
-> Replace `my_malloc`, `my_realloc`, and `my_free` with the actual function names defined in `include/Allocator.h`.
+### Using `calloc_clone()`
 
-## How It Works
+```c
+char *buffer = (char *)calloc_clone(100, sizeof(char));
 
-The allocator manages a custom heap using memory blocks. Each allocation stores metadata that allows the allocator to track block size, allocation status, and neighboring blocks.
-
-### Block Splitting
-
-When a requested allocation is smaller than an available free block, the allocator splits the block. One part is returned to the caller, while the remaining part stays in the free list.
-
-### Block Coalescing
-
-When memory is freed, adjacent free blocks are merged into a larger block. This helps reduce fragmentation and improves the chances of satisfying future allocation requests.
-
-### Debugging and Safety Checks
-
-The allocator includes checks for common memory-management mistakes:
-
-- Freeing a pointer that was not allocated by the allocator
-- Freeing the same pointer more than once
-- Detecting memory that was allocated but never freed
-- Checking heap metadata for corruption or inconsistency
-
-## Allocator Statistics
-
-The debug module can report information such as:
-
-- Total allocated memory
-- Total free memory
-- Number of active allocations
-- Number of detected leaks
-- Heap integrity status
-
-## Testing
-
-The test suite in `tests/test_allocator.c` validates core allocator behavior, including allocation, reallocation, freeing, and error detection.
-
-Run the tests with:
-
-```bash
-make
-./test
+if (buffer != NULL) {
+    /* The allocated memory is initialized to zero. */
+    free_clone(buffer);
+}
 ```
 
-## Possible Improvements
+## Function Behavior
+
+| Function | Behavior |
+|---|---|
+| `malloc_clone(size)` | Allocates aligned memory of the requested size |
+| `calloc_clone(n, size)` | Allocates memory for `n` elements and initializes it to zero |
+| `realloc_clone(ptr, size)` | Resizes an existing allocation; allocates and copies data when needed |
+| `free_clone(ptr)` | Marks a block as free and merges adjacent free blocks |
+
+## Current Limitations
+
+- Not thread-safe
+- Uses `sbrk()`, so it is platform-dependent
+- Uses first-fit search, which may lead to fragmentation in some workloads
+- Does not return memory at the end of the heap back to the operating system
+- `realloc_clone()` allocates a new block and copies data instead of expanding the block in place
+
+## Future Improvements
 
 - Add thread-safety using mutexes
-- Implement aligned allocations
-- Add segregated free lists for different block sizes
-- Support mmap-backed large allocations
+- Implement best-fit or next-fit allocation strategies
+- Add aligned allocation support
+- Use `mmap()` for large allocations
+- Add detailed memory-leak reports
 - Add Valgrind and AddressSanitizer test targets
-- Improve heap visualization and detailed diagnostics
-
 
 ## Author
 
