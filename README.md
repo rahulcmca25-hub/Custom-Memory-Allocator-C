@@ -150,9 +150,6 @@ make
 - Add Valgrind and AddressSanitizer test targets
 - Improve heap visualization and detailed diagnostics
 
-## License
-
-This project is available for educational and personal use. Add a license such as MIT if you plan to allow others to reuse or distribute the code.
 
 ## Author
 
