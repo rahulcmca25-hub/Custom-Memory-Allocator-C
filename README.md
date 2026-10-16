@@ -78,7 +78,7 @@ make clean
 #include <stdio.h>
 
 int main(void) {
-    int *arr = (int *)my_malloc(10 * sizeof(int));
+    int *arr = (int *)malloc_clone(10 * sizeof(int));
 
     if (arr == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
@@ -89,7 +89,7 @@ int main(void) {
         arr[i] = i * i;
     }
 
-    arr = (int *)my_realloc(arr, 20 * sizeof(int));
+    arr = (int *)realloc_clone(arr, 20 * sizeof(int));
 
     my_free(arr);
 
